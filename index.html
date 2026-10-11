@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ne Yer? – Hayvan Beslenme Oyunu</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a1f1a; --bg2:#12332a; --card:#173d33; --leaf:#7ee081; --amber:#ffb347;
+  --text:#f2fff6; --muted:#9cc7b3; --bad:#ff6b6b; --gold:#ffd24a;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{min-height:100%}
+body{
+  font-family:'Fredoka',system-ui,sans-serif;color:var(--text);
+  background:radial-gradient(circle at 50% -10%,var(--bg2),var(--bg) 60%) fixed;
+  padding:max(16px,env(safe-area-inset-top)) 16px max(24px,env(safe-area-inset-bottom));
+  display:flex;justify-content:center;
+}
+.app{width:100%;max-width:460px;display:flex;flex-direction:column;align-items:center;gap:20px}
+h1{font-size:clamp(2rem,9vw,2.8rem);font-weight:700;text-align:center;line-height:1.05;margin-top:8px}
+.sub{color:var(--muted);text-align:center;margin-top:-10px}
+.screen{width:100%;display:none;flex-direction:column;align-items:center;gap:18px}
+.screen.active{display:flex}
+
+/* Beyaz neon çerçeve */
+.neon{
+  width:min(250px,68vw);aspect-ratio:4/5;border-radius:20px;padding:6px;background:#fff0;
+  border:3px solid #fff;
+  box-shadow:0 0 4px #fff,0 0 14px #fff,0 0 34px rgba(255,255,255,.65),
+             0 0 70px rgba(255,255,255,.35),inset 0 0 10px rgba(255,255,255,.7);
+}
+.neon img{width:100%;height:100%;object-fit:cover;border-radius:13px;display:block}
+
+.field{width:100%;display:flex;flex-direction:column;gap:10px}
+input{
+  width:100%;padding:15px 16px;font:inherit;font-size:1.1rem;text-align:center;
+  background:var(--card);color:var(--text);border:2px solid transparent;border-radius:14px;outline:none
+}
+input::placeholder{color:var(--muted)}
+input:focus-visible{border-color:var(--leaf)}
+button{
+  font:inherit;font-weight:600;font-size:1.15rem;border:0;border-radius:14px;padding:15px 18px;
+  cursor:pointer;color:#0a1f1a;background:var(--leaf);width:100%;transition:transform .08s
+}
+button:active{transform:scale(.97)}
+button:focus-visible{outline:3px solid #fff;outline-offset:2px}
+button.ghost{background:var(--card);color:var(--text)}
+.err{color:var(--bad);text-align:center;min-height:1.2em;font-size:.95rem}
+
+/* Oyun */
+.hud{width:100%;display:flex;justify-content:space-between;align-items:center;color:var(--muted)}
+.hud b{color:var(--text)}
+.bar{width:100%;height:8px;border-radius:8px;background:var(--card);overflow:hidden}
+.bar i{display:block;height:100%;width:100%;background:var(--amber);transform-origin:left;transition:transform 1s linear}
+.animal{font-size:clamp(5rem,28vw,7.5rem);line-height:1;margin:4px 0}
+.q{font-size:1.4rem;text-align:center;font-weight:500}
+.opts{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.opt{background:var(--card);color:var(--text);font-size:1.05rem;padding:16px 8px;display:flex;flex-direction:column;gap:4px;align-items:center}
+.opt span{font-size:1.9rem}
+.opt.ok{background:var(--leaf);color:#0a1f1a}
+.opt.no{background:var(--bad);color:#fff}
+.opts.lock .opt{pointer-events:none}
+.result-score{font-size:4rem;font-weight:700;color:var(--amber)}
+
+/* Liderlik tablosu */
+.board{width:100%;background:var(--card);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:8px}
+.board h2{font-size:1.2rem;text-align:center;margin-bottom:2px}
+.row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.04)}
+.row .rk{width:28px;text-align:center;color:var(--muted)}
+.row .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .sc{font-weight:600}
+.row.me{outline:2px solid var(--leaf)}
+/* 1. sıra farklı */
+.row.first{
+  position:relative;padding:16px 14px;font-size:1.2rem;color:#2a1c00;
+  background:linear-gradient(110deg,#ffd24a,#fff2a6 45%,#ffc21a);
+  box-shadow:0 0 18px rgba(255,210,74,.55);
+  animation:glow 2.2s ease-in-out infinite alternate;
+}
+.row.first .rk{color:#2a1c00;font-size:1.6rem}
+.row.first .nm{font-weight:700}
+@keyframes glow{to{box-shadow:0 0 32px rgba(255,210,74,.9)}}
+.empty{text-align:center;color:var(--muted);padding:8px}
+@media (prefers-reduced-motion:reduce){.row.first{animation:none}.bar i{transition:none}}
+</style>
+</head>
+<body>
+<main class="app">
+  <h1>Ne Yer? 🐾</h1>
+  <p class="sub">Hayvanlar ne yiyor, bakalım bilecek misin?</p>
+
+  <!-- Başlangıç -->
+  <section id="home" class="screen active">
+    <div class="neon"><img src="game-cover_jpg.png" alt="Oyun kapak fotoğrafı"></div>
+    <div class="field">
+      <input id="name" maxlength="14" placeholder="Kullanıcı adını yaz" autocomplete="off">
+      <div class="err" id="err"></div>
+      <button id="start">Oyunu Başlat</button>
+    </div>
+    <div class="board" id="board-home"></div>
+  </section>
+
+  <!-- Oyun -->
+  <section id="game" class="screen">
+    <div class="hud"><span id="who"></span><span>Soru <b id="qn">1</b>/4</span><span>Puan <b id="pts">0</b></span></div>
+    <div class="bar"><i id="timer"></i></div>
+    <div class="animal" id="emoji"></div>
+    <div class="q" id="qtext"></div>
+    <div class="opts" id="opts"></div>
+  </section>
+
+  <!-- Sonuç -->
+  <section id="end" class="screen">
+    <div class="q" id="endmsg"></div>
+    <div class="result-score" id="final">0</div>
+    <div class="board" id="board-end"></div>
+    <button id="again">Tekrar Oyna</button>
+    <button class="ghost" id="home-btn">Ana Sayfa</button>
+  </section>
+</main>
+
+<script>
+const ANIMALS=[
+ {e:'🐼',n:'Panda',f:'Bambu',fe:'🎋'},
+ {e:'🐨',n:'Koala',f:'Okaliptüs yaprağı',fe:'🌿'},
+ {e:'🦁',n:'Aslan',f:'Et',fe:'🥩'},
+ {e:'🐰',n:'Tavşan',f:'Havuç',fe:'🥕'},
+ {e:'🐵',n:'Maymun',f:'Muz',fe:'🍌'},
+ {e:'🐄',n:'İnek',f:'Ot',fe:'🌾'},
+ {e:'🐧',n:'Penguen',f:'Balık',fe:'🐟'},
+ {e:'🐝',n:'Arı',f:'Çiçek nektarı',fe:'🌼'},
+ {e:'🦒',n:'Zürafa',f:'Akasya yaprağı',fe:'🍃'},
+ {e:'🐿️',n:'Sincap',f:'Fındık',fe:'🌰'}
+];
+const ROUNDS=4, TIME=15, KEY='neyer_lb_v1';
+const $=id=>document.getElementById(id);
+let user='',qs=[],qi=0,score=0,left=TIME,tick=null;
+
+const shuffle=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+const show=id=>{document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));$(id).classList.add('active');window.scrollTo(0,0)};
+const esc=s=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* Liderlik tablosu (tarayıcıda saklanır) */
+const load=()=>{try{return JSON.parse(localStorage.getItem(KEY))||[]}catch{return[]}};
+function save(name,s){
+  const lb=load(), i=lb.findIndex(x=>x.name.toLowerCase()===name.toLowerCase());
+  if(i>-1){ if(s>lb[i].score) lb[i]={name,score:s,t:Date.now()}; }
+  else lb.push({name,score:s,t:Date.now()});
+  lb.sort((a,b)=>b.score-a.score||a.t-b.t);
+  try{localStorage.setItem(KEY,JSON.stringify(lb.slice(0,10)))}catch{}
+}
+function render(el,me){
+  const lb=load();
+  let h='<h2>🏆 Liderlik Tablosu</h2>';
+  if(!lb.length) h+='<div class="empty">Henüz kimse oynamadı. İlk sen ol!</div>';
+  lb.forEach((r,i)=>{
+    const cls='row'+(i===0?' first':'')+(me&&r.name.toLowerCase()===me.toLowerCase()?' me':'');
+    const rk=i===0?'👑':i+1;
+    h+=`<div class="${cls}"><div class="rk">${rk}</div><div class="nm">${esc(r.name)}</div><div class="sc">${r.score}</div></div>`;
+  });
+  el.innerHTML=h;
+}
+
+/* Oyun akışı */
+function start(){
+  const n=$('name').value.trim();
+  if(n.length<2){$('err').textContent='Lütfen en az 2 harfli bir kullanıcı adı yaz.';$('name').focus();return}
+  $('err').textContent='';
+  user=n;score=0;qi=0;
+  qs=shuffle(ANIMALS).slice(0,ROUNDS);
+  $('who').textContent=user;
+  show('game');ask();
+}
+function ask(){
+  const a=qs[qi];
+  $('qn').textContent=qi+1;$('pts').textContent=score;
+  $('emoji').textContent=a.e;
+  $('qtext').textContent=`${a.n} ne yer?`;
+  const wrong=shuffle(ANIMALS.filter(x=>x.f!==a.f)).slice(0,3);
+  const opts=shuffle([a,...wrong]);
+  $('opts').className='opts';
+  $('opts').innerHTML=opts.map(o=>`<button class="opt" data-f="${esc(o.f)}"><span>${o.fe}</span>${o.f}</button>`).join('');
+  $('opts').querySelectorAll('.opt').forEach(b=>b.onclick=()=>answer(b,a));
+  left=TIME;
+  const t=$('timer');t.style.transition='none';t.style.transform='scaleX(1)';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{t.style.transition='';}));
+  clearInterval(tick);
+  tick=setInterval(()=>{
+    left--;t.style.transform=`scaleX(${left/TIME})`;
+    if(left<=0){clearInterval(tick);answer(null,a)}
+  },1000);
+}
+function answer(btn,a){
+  clearInterval(tick);
+  $('opts').classList.add('lock');
+  const ok=btn&&btn.dataset.f===a.f;
+  if(ok){score+=10+Math.max(0,left);btn.classList.add('ok')}
+  else{if(btn)btn.classList.add('no');
+    $('opts').querySelectorAll('.opt').forEach(b=>{if(b.dataset.f===a.f)b.classList.add('ok')})}
+  $('pts').textContent=score;
+  setTimeout(()=>{ qi++; qi<ROUNDS?ask():finish() },1100);
+}
+function finish(){
+  save(user,score);
+  $('final').textContent=score;
+  const lb=load(), rank=lb.findIndex(x=>x.name.toLowerCase()===user.toLowerCase());
+  $('endmsg').textContent= rank===0 ? `Tebrikler ${user}, 1. sıradasın! 👑` : `Bitti ${user}! Puanın:`;
+  render($('board-end'),user);
+  show('end');
+}
+
+$('start').onclick=start;
+$('name').addEventListener('keydown',e=>{if(e.key==='Enter')start()});
+$('again').onclick=()=>{qi=0;score=0;qs=shuffle(ANIMALS).slice(0,ROUNDS);show('game');ask()};
+$('home-btn').onclick=()=>{render($('board-home'));show('home')};
+render($('board-home'));
+</script>
+</body>
+</html>
